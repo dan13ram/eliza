@@ -1,0 +1,38 @@
+import type {
+    Address,
+    Hash,
+} from "viem";
+import * as viemChains from "viem/chains";
+
+const _SupportedChainList = Object.keys(viemChains) as Array<keyof typeof viemChains>;
+export type SupportedChain = (typeof _SupportedChainList)[number];
+
+// Action types
+export interface MintParams {
+    chain: SupportedChain;
+    hatId: Hash;
+    toAddress: Address;
+}
+
+export interface MintResponse {
+    hash: Hash;
+    wearer: Address;
+    hatId: Hash;
+    chainId?: number;
+}
+
+// Action types
+export interface RevokeParams {
+    chain: SupportedChain;
+    hatId: Hash;
+    fromAddress: Address;
+    goodStanding: boolean;
+}
+
+export interface RevokeResponse {
+    hash: Hash;
+    wearer: Address;
+    standing: boolean;
+    hatId: Hash;
+    chainId?: number;
+}

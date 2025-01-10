@@ -36,6 +36,7 @@
     "@elizaos/plugin-coinbase": "workspace:*",
     "@elizaos/plugin-conflux": "workspace:*",
     "@elizaos/plugin-evm": "workspace:*",
+    "@elizaos/plugin-hats": "workspace:*",
     "@elizaos/plugin-flow": "workspace:*",
     "@elizaos/plugin-story": "workspace:*",
     "@elizaos/plugin-goat": "workspace:*",
