@@ -11,24 +11,18 @@ import {
 } from "@elizaos/core";
 
 import { initWalletProvider, WalletProvider } from "../providers/wallet";
-import type { RevokeResponse, RevokeParams } from "../types";
-import { revokeTemplate } from "../templates";
+import type { BalanceResponse, BalanceParams } from "../types";
+import { balanceTemplate } from "../templates";
 
-export { revokeTemplate };
+export { balanceTemplate };
 
 // Exported for tests
-export class RevokeAction {
+export class BalanceAction {
     constructor(private walletProvider: WalletProvider) { }
 
-    async revokeHat(params: RevokeParams): Promise<RevokeResponse> {
+    async balance(params: BalanceParams): Promise<BalanceResponse> {
         console.log(
-            `Revoking: Hat ID ${params.hatId} from ${params.fromAddress} on ${params.chain}`
-        );
-
-        this.walletProvider.switchChain(params.chain);
-
-        const walletClient = this.walletProvider.getWalletClient(
-            params.chain
+            `Fetching Hat Balance: Hat ID ${params.hatId} for ${params.userAddress} on ${params.chain}`
         );
 
         const publicClient = this.walletProvider.getPublicClient(
@@ -40,34 +34,31 @@ export class RevokeAction {
             abi: HATS_ABI,
             client: {
                 public: publicClient,
-                wallet: walletClient,
             },
         });
 
         try {
-            const hash = await hatContract.write.setHatWearerStatus([params.hatId, params.fromAddress, false, params.goodStanding]);
+            const balance = await hatContract.read.balanceOf([params.userAddress, params.hatId]);
 
             return {
-                hash,
-                wearer: params.fromAddress,
-                hatId: params.hatId,
-                standing: params.goodStanding,
+                balance: Number(balance),
+                hatId: params.hatId
             };
         } catch (e) {
             const error = e as Error;
-            throw new Error(`Revoking of Hat failed: ${error.message}`);
+            throw new Error(`Balance of Hat failed: ${error.message}`);
         }
     }
 }
 
-const buildRevokeDetails = async (
+const buildBalanceDetails = async (
     state: State,
     runtime: IAgentRuntime,
     wp: WalletProvider
-): Promise<RevokeParams> => {
+): Promise<BalanceParams> => {
     const context = composeContext({
         state,
-        template: revokeTemplate,
+        template: balanceTemplate,
     });
 
     const chains = Object.keys(wp.chains);
@@ -77,29 +68,29 @@ const buildRevokeDetails = async (
         chains.map((item) => `"${item}"`).join("|")
     );
 
-    const revokeHatDetails = (await generateObjectDeprecated({
+    const balanceDetails = (await generateObjectDeprecated({
         runtime,
         context: contextWithChains,
         modelClass: ModelClass.SMALL,
-    })) as RevokeParams;
+    })) as BalanceParams;
 
-    const existingChain = wp.chains[revokeHatDetails.chain];
+    const existingChain = wp.chains[balanceDetails.chain];
 
     if (!existingChain) {
         throw new Error(
             "The chain " +
-            revokeHatDetails.chain +
+            balanceDetails.chain +
             " not configured yet. Add the chain or choose one from configured: " +
             chains.toString()
         );
     }
 
-    return revokeHatDetails;
+    return balanceDetails;
 };
 
-export const revokeHatAction = {
-    name: "revokeHat",
-    description: "Revoke a Hat to a specified address",
+export const balanceAction = {
+    name: "balance",
+    description: "Check the balance of a Hat for a specified address and Hat ID",
     handler: async (
         runtime: IAgentRuntime,
         _message: Memory,
@@ -110,27 +101,26 @@ export const revokeHatAction = {
         if (!state) {
             throw new Error("State is required");
         }
-        console.log("RevokeHat action handler called");
+        console.log("Hat balance action handler called");
         const walletProvider = initWalletProvider(runtime);
-        const action = new RevokeAction(walletProvider);
+        const action = new BalanceAction(walletProvider);
 
-        // Compose revokeHat context
-        const paramOptions = await buildRevokeDetails(
+        // Compose balance context
+        const paramOptions = await buildBalanceDetails(
             state,
             runtime,
             walletProvider
         );
 
         try {
-            const revokeHatResp = await action.revokeHat(paramOptions);
+            const balanceResp = await action.balance(paramOptions);
             if (callback) {
                 callback({
-                    text: `Successfully revoked Hat ID ${paramOptions.hatId} from ${paramOptions.fromAddress}\nTransaction Hash: ${revokeHatResp.hash}`,
+                    text: `Balance of Hat ID ${paramOptions.hatId} for Address ${paramOptions.userAddress} is ${balanceResp.balance}`,
                     content: {
                         success: true,
-                        hash: revokeHatResp.hash,
-                        hatId: revokeHatResp.hatId,
-                        wearer: paramOptions.fromAddress,
+                        hatId: balanceResp.hatId,
+                        balance: balanceResp.balance,
                         chain: paramOptions.chain,
                     },
                 });
@@ -138,38 +128,37 @@ export const revokeHatAction = {
             return true;
         } catch (e) {
             const error = e as Error;
-            console.error("Error during revokeHat:", error);
+            console.error("Error during balance:", error);
             if (callback) {
                 callback({
-                    text: `Error revokeing hat: ${error.message}`,
+                    text: `Error fetching hat balance: ${error.message}`,
                     content: { error: error.message },
                 });
             }
             return false;
         }
     },
-    template: revokeTemplate,
-    validate: async (runtime: IAgentRuntime) => {
-        const privateKey = runtime.getSetting("EVM_PRIVATE_KEY");
-        return typeof privateKey === "string" && privateKey.startsWith("0x");
+    template: balanceTemplate,
+    validate: async () => {
+        return true;
     },
     examples: [
         [
             {
                 user: "assistant",
                 content: {
-                    text: "I'll help you revoke the Hat ID 12345 from 0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-                    action: "REVOKE_HAT",
+                    text: "I'll help you check if 0x742d35Cc6634C0532925a3b844Bc454e4438f44e has a Hat ID 12345",
+                    action: "HAT_BALANCE",
                 },
             },
             {
                 user: "user",
                 content: {
-                    text: "Revoke the Hat ID 12345 from 0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-                    action: "REVOKE_HAT",
+                    text: "Can you check if 0x742d35Cc6634C0532925a3b844Bc454e4438f44e has a Hat ID 12345",
+                    action: "HAT_BALANCE",
                 },
             },
         ],
     ],
-    similes: ["REVOKE_HAT", "REMOVE_HAT"],
+    similes: ["HAT_BALANCE", "CHECK_HAT_BALANCE"],
 };

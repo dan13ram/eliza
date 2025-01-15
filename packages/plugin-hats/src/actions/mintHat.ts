@@ -51,7 +51,6 @@ export class MintAction {
                 hash,
                 wearer: params.toAddress,
                 hatId: params.hatId,
-                chainId: walletClient.chain.id,
             };
         } catch (e) {
             const error = e as Error;
